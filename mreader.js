@@ -16,7 +16,13 @@ var options = {
 
 var driver = webdriverio.remote(options);
 var ulist_idx = 0;
-var el_idx = 0;
+var urls_idx = 0;
+var messages = [{
+	timestamp: '',
+	author: '',
+	jobtitle: '',
+	mcont: '',
+}];
 var ulist = [{
 	email: 'nbvn564hg@gmail.com',
 	pass: 'Iag1zXDaoH',
@@ -78,35 +84,106 @@ function ldin_login(email){
 					.pause(2200)
 					.click('#login-submit')
 					.pause(4300)
-					.isExisting('li#messaging-nav-item.nav-item--messaging span.nav-item__badge-count').then(function(res){
-					//if (res !== false){
-						driver
-							.getText('li#messaging-nav-item.nav-item--messaging span.nav-item__badge-count').then(function(mcount){
-								console.log('There are '+mcount+' new messages for '+ulist[ulist_idx].email);
-								console.log('Will print them out in a bit...');
-								driver
-									.click('a[data-link-to="messaging"]')
-									.pause(2400)
-									.getElements('.msg-conversation-card h3').then(function(author){
-								var alist = author;
-							});
-						});
-					//} 
-					//else {
-						console.log('There are no messages, moving on to the next user...');
-						ulist_idx++;
-						ldin_login(ulist[ulist_idx].email);
+					.click('a[data-link-to="messaging"]')
+					.pause(2400)
+					.isExisting('.msg-conversation-listitem--unread a').then(function(status){
+						if (status !== true){
+							console.log('There are no new messages for '+ulist[ulist_idx]+' Moving on');
+							ulist_idx++;
+							ldin_login(ulist[ulist_idx].email);
+						}
+						else if (status === true){
+							driver
+								.getAttribute('.msg-conversation-listitem--unread a', 'href').then(function(urls){
+									if (typeof urls != 'object'){
+										urls = [urls];
+											if (urls_idx >= urls.length){
+												console.log('Done cycling through '+ulist[ulist_idx].email+' messages, '+'Moving on');
+												ulist_idx++;
+												messages = [{timestamp: '', author: '', jobtitle: '', mcont: '',}];
+												return ldin_login(ulist[ulist_idx].email);
+											} else {
+												layMess(urls[urls_idx], function cb(results){
+													console.log('-----Next message-----');
+													urls_idx++;
+													layMess(urls[urls_idx], cb);
+												});
 
-					//}
-				});
-				
+											}
+									}
 
-		});
+							  });
+						} 
+					});
+
+		    }); 
 		
 	}
 
 }
-function getM(){
+function layMess(mUrl, callback){
+	isSpons(mUrl, function(result){
+		if (result !== true){
+				driver
+					.pause(3500)
+					.getText('dd.msg-entity-lockup__entity-info').then(function(jobtitle){
+					 	messages.jobtitle = jobtitle;
+					 	console.log(messages.jobtitle);
+						driver
+							.pause(4424)
+							.getText('.msg-s-message-listitem p').then(function(mcont){
+							messages.mcont = mcont;
+							console.log(messages.mcont);
+							driver
+								.getText('.msg-s-message-list__time-heading').then(function(timestamp){
+								 messages.timestamp = timestamp;
+								 console.log(timestamp);
+								 callback(messages);
+
+								});
+									
+							});
+				  		
+					});
+
+			}
+			else if (result === true) {
+				driver
+					.pause(3650)
+					.getText('.msg-spinmail-thread__message-body').then(function(mcont){
+						messages.mcont = mcont;
+						driver
+							.getText('.msg-entity-lockup__entity-title').then(function(author){
+								console.log('From: '+author);
+								console.log('------------Starting msg body-----------');
+								console.log(mcont);
+								console.log('------------End of msg body-------------');
+								console.log('There is no timestamp for sponsored messages');
+								messages.author = author;
+								callback(messages);
+							});
+
+					});
+			}
+	});
+}
+
+function isSpons(site, callback){
+	driver
+		.pause(4000)
+		.url(site)
+		.pause(3400)
+		.isExisting('.sponsored-label').then(function(res){
+			if (res !== true){
+				console.log('This is not a sponsored message');
+				callback(res);
+			}
+			else if (res === true) {
+				console.log('This is a sponsored message');
+				callback(res);
+			}
+
+		});
 
 }
 
